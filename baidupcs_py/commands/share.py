@@ -182,6 +182,7 @@ def list_shared_paths(
     all_shared_paths: List[PcsSharedPath] = []
 
     shared_paths = deque(api.shared_paths(shared_url))
+    print(f'shared_paths = {shared_paths}')
     all_shared_paths += shared_paths
 
     while shared_paths:
@@ -206,6 +207,50 @@ def list_shared_paths(
 
     display_shared_paths(*all_shared_paths)
 
+def verify_total_size(
+    api: BaiduPCSApi,
+    shared_url: str,
+    password: Optional[str] = None,
+):
+    shared_url = _unify_shared_url(shared_url)
+
+    # Vertify with password
+    if password:
+        api.access_shared(shared_url, password, show_vcode=True)
+
+    all_shared_paths: List[PcsSharedPath] = []
+
+    shared_paths = deque(api.shared_paths(shared_url))
+    all_shared_paths += shared_paths
+
+    while shared_paths:
+        shared_path = shared_paths.popleft()
+
+        uk, share_id, bdstoken = (
+            shared_path.uk,
+            shared_path.share_id,
+            shared_path.bdstoken,
+        )
+        assert uk
+        assert share_id
+        assert bdstoken
+
+        if shared_path.is_dir:
+            # Take all sub paths
+            sub_paths = list_all_sub_paths(
+                api, shared_path.path, uk, share_id, bdstoken
+            )
+            all_shared_paths += sub_paths
+            shared_paths.extendleft(sub_paths[::-1])
+
+    # calc_size(*all_shared_paths)
+    total_size = 0
+    for shared_path in all_shared_paths:
+        total_size += shared_path.size
+
+    return total_size
+
+
 
 def remotepath_exists(
     api: BaiduPCSApi, name: str, rd: str, _cache: Dict[str, Set[str]] = {}
@@ -215,3 +260,4 @@ def remotepath_exists(
         names = set([PurePosixPath(sp.path).name for sp in api.list(rd)])
         _cache[rd] = names
     return name in names
+
