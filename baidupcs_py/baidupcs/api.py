@@ -1,7 +1,5 @@
 from typing import Optional, Dict, List, Tuple, Callable, IO
 
-from io import BytesIO
-
 from baidupcs_py.common import constant
 from baidupcs_py.common.crypto import calu_md5
 from baidupcs_py.common.io import RangeRequestIO, MAX_CHUNK_SIZE
@@ -21,11 +19,10 @@ from baidupcs_py.baidupcs.inner import (
 )
 
 from requests_toolbelt import MultipartEncoderMonitor
-from PIL import Image
+from baidupcs_py.commands.log import get_logger
 
 from rich import print
-from rich.prompt import Prompt
-
+import ddddocr
 
 class BaiduPCSApi:
     """Baidu PCS Api
@@ -45,6 +42,8 @@ class BaiduPCSApi:
         self._baidupcs = BaiduPCS(
             bduss, stoken=stoken, ptoken=ptoken, cookies=cookies, user_id=user_id
         )
+
+        self.logger = get_logger(__name__)
 
     @property
     def bduss(self) -> str:
@@ -383,7 +382,7 @@ class BaiduPCSApi:
         show_vcode (bool): If set True, it will be open the vcode image (if needed)
             with a gui window. Else, you need to handle the vcode.
         """
-
+        self.logger.info("`api`: access_shared start %s", vcode)
         while True:
             try:
                 self._baidupcs.access_shared(shared_url, password, vcode_str, vcode)
@@ -398,11 +397,14 @@ class BaiduPCSApi:
                         print("[red]vcode is incorrect![/red]")
                     vcode_str, vcode_img_url = self.getcaptcha(shared_url)
                     img_cn = self.get_vcode_img(vcode_img_url, shared_url)
-                    img_buf = BytesIO(img_cn)
-                    img_buf.seek(0, 0)
-                    img = Image.open(img_buf)
-                    img.show()
-                    vcode = Prompt.ask("input vcode")
+                    ocr = ddddocr.DdddOcr()
+                    vcode = ocr.classification(img_cn)
+                    self.logger.info("`api`: ocr result: %s", vcode)
+                    # img_buf = BytesIO(img_cn)
+                    # img_buf.seek(0, 0)
+                    # img = Image.open(img_buf)
+                    # img.show()
+                    # vcode = Prompt.ask("input vcode")
                 else:
                     raise err
 
